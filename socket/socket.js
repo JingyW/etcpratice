@@ -38,3 +38,4 @@ client.write({})
 client.on('end', function() {
    console.log('disconnected from server');
 });
+https://www.npmjs.com/package/json-socket
