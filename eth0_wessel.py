@@ -4,7 +4,7 @@ from __future__ import print_function
 import sys
 import socket
 import json
-import time 
+import time
 
 
 class Order():
@@ -65,13 +65,13 @@ class Portfolio():
           continue
         self.lastOrderTime = time.time()
         return
-    
+
     def CancelObsoleteOrders(self, symbol, fair_price, halfSpread):
         for orderId in self.orders:
-          if orderId in self.outstandingCancels : 
+          if orderId in self.outstandingCancels :
             continue
           order = self.orders[orderId]
-          if order.symbol != symbol: 
+          if order.symbol != symbol:
             continue
           if order.direction == "BUY":
             order_price = order.price + halfSpread
@@ -98,7 +98,7 @@ def convertXLF(direction, amount, p, exchange):
     json_string = '{"type": "convert", "order_id": %d' % orderID + ', "symbol": "XLF", "dir": "' + direction + '", "size": %s}' % str(amount)
     print(json_string, file=sys.stderr)
     p.waitUntilServerReady()
-    print(json_string, file=exchange)   
+    print(json_string, file=exchange)
     p.orders[orderID] = Order("XLF", -1, amount, direction, p, isConvert = True)
     if direction == "BUY":
       sign = +1
@@ -109,7 +109,7 @@ def convertXLF(direction, amount, p, exchange):
     p.positions["GS"] -= sign * 2 * amount/10
     p.positions["MS"] -= sign * 3 * amount/10
     p.positions["WFC"] -= sign * 2 * amount/10
-    
+
 
 
 #direction is "BUY" or "SELL"
@@ -119,13 +119,13 @@ def orderSec(symbol, direction, price, amount, p, exchange):
     json_string = '{"type": "add", "order_id": '+ str(orderId) + ',"symbol": "' + symbol +'", "dir": "' +  direction + '", "price": ' + str(price) + ', "size" : ' + str(amount) + '}'
     print(json_string, file=sys.stderr)
     p.waitUntilServerReady()
-    print(json_string, file=exchange)   
+    print(json_string, file=exchange)
     p.orders[orderId] = Order(symbol, price, amount, direction, p)
 
 def tradeSymbol(symbol, exchange, fair_price, spread, p):
     buy = p.positions[symbol] + p.OutstandingOrders(symbol, "BUY")
     sell = -1 * p.positions[symbol] + p.OutstandingOrders(symbol, "SELL")
-    symbolLimit = p.symbolToLimit[symbol] 
+    symbolLimit = p.symbolToLimit[symbol]
 
     if symbol in p.theEquities:
         buy_amount = 30 - buy
@@ -133,10 +133,10 @@ def tradeSymbol(symbol, exchange, fair_price, spread, p):
     else:
         buy_amount = symbolLimit - buy
         sell_amount = symbolLimit - sell
-    
+
     buy_amount = symbolLimit - buy
     sell_amount = symbolLimit - sell
-    
+
     if buy < symbolLimit and buy_amount > 0 :
         orderSec(symbol, "BUY", fair_price - spread, buy_amount, p, exchange)
     if sell < symbolLimit and sell_amount > 0:
@@ -149,7 +149,7 @@ def tradeBondDumbly(exchange):
     #put in two orders for bonds
     orderSec("BOND", "BUY", fair_price -1 , 100, p, exchange)
     orderSec("BOND", "SELL", fair_price + 1, 100, p, exchange)
-          
+
 
 def parseData(msg, p):
     dat = json.loads(msg)
@@ -190,7 +190,7 @@ def parseData(msg, p):
           p.positions[theSym] = position
 
 def main():
-    if len (sys.argv) != 2: 
+    if len (sys.argv) != 2:
       print ("feed server address as argument!")
       sys.exit(2)
     s, exchange = connect(sys.argv[1])
@@ -198,35 +198,35 @@ def main():
     print(json_string, file=exchange)
     hello_from_exchange = exchange.readline().strip()
     print("The exchange replied: %s" % str(hello_from_exchange),file = sys.stderr)
-    
+
     global p
     p = Portfolio(exchange)
     parseData(hello_from_exchange, p)
 
     print("entering main loop", file = sys.stderr)
-   
+
     disableBOND = False
     disableVale = False
     disableXLF = False
-    
+
     if not disableBOND:
-        tradeBondDumbly(exchange) 
-    
+        tradeBondDumbly(exchange)
+
     while 1:
       if not disableBOND:
         tradeSymbol("BOND", exchange, 1000, p.halfSpread["BOND"], p)
-      
+
       if not disableVale:
         if  p.highestBuy["VALBZ"] != 0 and p.cheapestSell["VALBZ"] !=0:
             price_VALE = int(round((p.highestBuy["VALBZ"] + p.cheapestSell["VALBZ"])/2.0))
             p.CancelObsoleteOrders("VALE", price_VALE, p.halfSpread["VALE"])
             tradeSymbol("VALE", exchange, price_VALE, p.halfSpread["VALE"], p)
 
-      
+
       message = exchange.readline().strip()
       parseData(message, p)
-      
-      if not disableXLF: 
+
+      if not disableXLF:
         if p.highestBuy['GS'] != 0 and p.cheapestSell['GS']!=0 and p.highestBuy['MS'] !=0 and p.cheapestSell['MS'] !=0 and p.highestBuy['WFC'] !=0 and p.cheapestSell['WFC'] !=0 and p.cheapestSell['XLF'] != 0 and p.highestBuy['XLF'] != 0:
           price_WFC = int(round((p.highestBuy['WFC']+  p.cheapestSell['WFC'])/2.0))
           price_MS = int(round((p.highestBuy['MS']+  p.cheapestSell['MS'])/2.0))
@@ -241,33 +241,33 @@ def main():
           shortAmount = -1 * p.positions["XLF"] + p.OutstandingOrders("XLF", "SELL")
 
           if abs(p.xlfguess - price_XLF) > 100/amount + 10:
-            
+
             if p.xlfguess < price_XLF:
               direction = "BUY"
             else:
               direction = "SELL"
-            
+
             if (direction == "BUY" and amount + longAmount < 100) or (direction == "SELL" and amount + shortAmount < 100):
               netDirection = ("BUY" if direction == "SELL" else "SELL")
               orderSec("XLF", netDirection, price_XLF + p.halfSpread["XLF"], amount, p, exchange)
               orderSec("GS", direction, price_GS, amount/10 * 2, p, exchange)
               orderSec("MS", direction, price_MS, amount/10 * 3, p, exchange)
               orderSec("WFC", direction, price_WFC, amount/10 * 2, p, exchange)
-             
+
               convertXLF(direction, amount, p, exchange)
 
               print("xlfguess: %d price_xlf: %d" % (p.xlfguess, price_XLF), file=sys.stderr)
           #p.CancelObsoleteOrders("XLF", p.xlfguess, p.halfSpread["XLF"])
-          #tradeSymbol("XLF", exchange, p.xlfguess, p.halfSpread["XLF"], p)              
+          #tradeSymbol("XLF", exchange, p.xlfguess, p.halfSpread["XLF"], p)
 
       if message is not None:
         #chuck away book messages for now
         m_type = json.loads(message)['type']
         if m_type == 'book' or m_type == 'trade' or m_type == 'ack':
           pass
-        else:  
+        else:
           print("> %s" % str (message), file =sys.stderr)
-      # have we got a message ? 
+      # have we got a message ?
 
 if __name__ == "__main__":
     main()
